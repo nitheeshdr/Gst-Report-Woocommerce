@@ -151,100 +151,165 @@ export const downloadInvoice = (order, productMap) => {
 <head>
 <meta charset="UTF-8">
 <style>
-  body { font-family: Arial, sans-serif; padding: 20px; font-size: 14px; color: #111; }
-  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 20px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-  th, td { padding: 8px; border: 1px solid #000; text-align: left; }
-  th { background: #f4f4f4; }
+  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; font-size: 14px; color: #111; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  th, td { text-align: left; vertical-align: top; }
+  
+  /* Head container */
+  .head { margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 20px; }
+  .header h1, .header h3 { margin: 0; }
   .shop-info { text-align: right; }
-  .totals-table td { border: none; padding: 6px; }
+  .shop-name h3 { margin: 0 0 5px 0; font-size: 1.2em; }
+  
+  /* Order Data & Addresses */
+  .order-data-addresses table { width: auto; margin: 0; }
+  .order-data-addresses th { padding-right: 15px; font-weight: bold; }
+  .order-data-addresses td { padding-bottom: 5px; }
+  .billing-address { width: 35%; padding-right: 20px; }
+  .shipping-address { width: 35%; padding-right: 20px; }
+  .order-data { width: 30%; }
+  
+  /* Order Details Table */
+  .order-details th { background: #010101ff; padding: 10px; border: 1px solid #ddd; }
+  .order-details td { padding: 10px; border: 1px solid #ddd; }
+  .order-details th.quantity, .order-details th.price, .order-details td.quantity, .order-details td.price { text-align: right; }
+  
+  /* Notes & Totals */
+  .notes-totals { margin-top: 20px; }
+  .notes-totals .no-borders td { border: none; padding: 0; }
+  .notes-cell { width: 60%; padding-right: 40px !important; }
+  .totals-cell { width: 40%; }
+  .totals th, .totals td { padding: 6px; border: none; }
+  .totals th { text-align: right; }
+  .totals td { text-align: right; }
+  
+  /* Terms */
+  .terms-conditions { margin-top: 20px; font-size: 12px; }
+  .terms-conditions ul { padding-left: 20px; margin-top: 5px; }
 </style>
 </head>
 <body>
-<div class="header"><h1>TAX INVOICE</h1></div>
 
-<table>
-  <tr>
-    <td>
-      <strong>Your Shop Name</strong><br/>
-      5, Thilagar Street, AGS Colony, Alwarthirunagar,<br/>
-      Chennai - 600087<br/>
-      GSTIN: 33AAJCN0778NIZZ
-    </td>
-    <td class="shop-info">
-      <strong>Invoice #:</strong> ${order.id}<br/>
-      <strong>Date:</strong> ${new Date(order.date_created).toLocaleDateString("en-IN")}<br/>
-      <strong>Payment:</strong> ${order.payment_method_title || "N/A"}
-    </td>
-  </tr>
+<table class="head container">
+	<tr>
+		<td class="header">
+      <h1>TAX INVOICE</h1>
+		</td>
+		<td class="shop-info">
+			<div class="shop-name"><h3>Your Shop Name</h3></div>
+			<div class="shop-address">
+				<strong>5, Thilagar Street, AGS Colony, Alwarthirunagar, Valasarawakkam, Chennai-600087, Tamil Nadu, India</strong>
+			</div>
+			<div class="shop-gstin">
+				<strong>GSTIN:</strong> 33AAJCN0778NIZZ
+			</div>
+		</td>
+	</tr>
 </table>
 
-<h4>Billing Address</h4>
-<p>
-  ${order.billing?.first_name || ""} ${order.billing?.last_name || ""}<br/>
-  ${order.billing?.address_1 || ""}<br/>
-  ${order.billing?.city || ""}, ${order.billing?.state || ""} - ${order.billing?.postcode || ""}<br/>
-  Phone: ${order.billing?.phone || ""}<br/>
-  GSTIN: ${gstin}
-</p>
-
-<h4>Items</h4>
-<table>
-  <thead>
-    <tr>
-      <th>Product</th>
-      <th>HSN</th>
-      <th>Qty</th>
-      <th>Rate</th>
-      <th>Total</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${order.line_items
-      .map((item) => {
-        const hsn = getHSN(item, productMap);
-        const qty = item.quantity || 1;
-        const rate = qty ? (parseFloat(item.subtotal || 0) / qty) : 0;
-        return `<tr>
-          <td>${item.name}</td>
-          <td>${hsn}</td>
-          <td>${qty}</td>
-          <td>₹${rate.toFixed(2)}</td>
-          <td>₹${parseFloat(item.subtotal || item.total || 0).toFixed(2)}</td>
-        </tr>`;
-      })
-      .join("")}
-  </tbody>
+<table class="order-data-addresses">
+	<tr>
+		<td class="address billing-address">
+      <h3>Billing Address</h3>
+			<p>
+        ${order.billing?.first_name || ""} ${order.billing?.last_name || ""}<br/>
+        ${order.billing?.address_1 || ""}<br/>
+        ${order.billing?.city || ""}, ${order.billing?.state || ""} - ${order.billing?.postcode || ""}<br/>
+        Phone: ${order.billing?.phone || ""}<br/>
+        GSTIN: ${gstin}
+      </p>
+		</td>
+		<td class="address shipping-address">
+      <h3>Shipping Address</h3>
+			<p>
+        ${order.shipping?.first_name || ""} ${order.shipping?.last_name || ""}<br/>
+        ${order.shipping?.address_1 || ""}<br/>
+        ${order.shipping?.city || ""}, ${order.shipping?.state || ""} - ${order.shipping?.postcode || ""}
+      </p>
+		</td>
+		<td class="order-data">
+			<table>
+				<tr class="order-number">
+					<th>Invoice Number / Order #:</th>
+					<td>${order.id}</td>
+				</tr>
+				<tr class="order-date">
+					<th>Date:</th>
+					<td>${new Date(order.date_created).toLocaleDateString("en-IN")}</td>
+				</tr>
+				<tr class="payment-method">
+					<th>Payment Method:</th>
+					<td>${order.payment_method_title || "N/A"}</td>
+				</tr>
+			</table>
+		</td>
+	</tr>
 </table>
 
-<table class="totals-table" style="width: 100%; margin-top: 8px;">
-  <tr>
-    <td style="width:70%"></td>
-    <td style="width:30%">
-      <table style="width:100%;">
-        <tr><td>Subtotal:</td><td style="text-align:right;">₹${subtotal.toFixed(2)}</td></tr>
-        ${gst.discountTotal > 0 ? `<tr><td>Discount:</td><td style="text-align:right;">-₹${gst.discountTotal.toFixed(2)}</td></tr>` : ""}
-        ${gst.cgst2_5 > 0 ? `<tr><td>CGST (2.5%):</td><td style="text-align:right;">₹${gst.cgst2_5.toFixed(2)}</td></tr>` : ""}
-        ${gst.sgst2_5 > 0 ? `<tr><td>SGST (2.5%):</td><td style="text-align:right;">₹${gst.sgst2_5.toFixed(2)}</td></tr>` : ""}
-        ${gst.cgst9 > 0 ? `<tr><td>CGST (9%):</td><td style="text-align:right;">₹${gst.cgst9.toFixed(2)}</td></tr>` : ""}
-        ${gst.sgst9 > 0 ? `<tr><td>SGST (9%):</td><td style="text-align:right;">₹${gst.sgst9.toFixed(2)}</td></tr>` : ""}
-        ${gst.igst5 > 0 ? `<tr><td>IGST (5%):</td><td style="text-align:right;">₹${gst.igst5.toFixed(2)}</td></tr>` : ""}
-        ${gst.igst18 > 0 ? `<tr><td>IGST (18%):</td><td style="text-align:right;">₹${gst.igst18.toFixed(2)}</td></tr>` : ""}
-        <tr><td><strong>Order Total:</strong></td><td style="text-align:right;"><strong>₹${order.total}</strong></td></tr>
-      </table>
-    </td>
-  </tr>
+<table class="order-details">
+	<thead>
+		<tr>
+			<th class="product">Product</th>
+			<th class="hsn">HSN</th>
+			<th class="quantity">Quantity</th>
+			<th class="price">Price</th>
+		</tr>
+	</thead>
+	<tbody>
+		${order.line_items.map((item) => {
+      const hsn = getHSN(item, productMap);
+      return `<tr>
+        <td class="product">${item.name}</td>
+        <td class="hsn">${hsn}</td>
+        <td class="quantity">${item.quantity}</td>
+        <td class="price">₹${parseFloat(item.subtotal || item.total || 0).toFixed(2)}</td>
+      </tr>`;
+    }).join("")}
+	</tbody>
 </table>
 
-<div style="margin-top:18px;">
-  <strong>Terms & Conditions</strong>
-  <ul>
-    <li>Subject to our home Jurisdiction.</li>
-    <li>Our Responsibility Ceases as soon as goods leaves our Premises.</li>
-    <li>Goods once sold will not taken back.</li>
-    <li>Delivery Ex-Premises.</li>
-  </ul>
-</div>
+<table class="notes-totals">
+	<tbody>
+		<tr class="no-borders">
+			<td class="no-borders notes-cell">
+        <div class="terms-conditions">
+          <h3>Terms and Conditions:</h3>
+          <ul>
+            <li>Subject to our home Jurisdiction.</li>
+            <li>Our Responsibility Ceases as soon as goods leaves our Premises.</li>
+            <li>Goods once sold will not taken back.</li>
+            <li>Delivery Ex-Premises.</li>
+            <li>To address any concerns about missing products, we kindly request a video recording of the package being opened.</li>
+          </ul>
+        </div>
+			</td>
+			<td class="no-borders totals-cell">
+				<table class="totals">
+					<tbody>
+            <tr>
+              <th>Items Subtotal:</th>
+              <td>₹${subtotal.toFixed(2)}</td>
+            </tr>
+            ${gst.discountTotal > 0 ? `<tr><th>Coupon Discount:</th><td>-₹${gst.discountTotal.toFixed(2)}</td></tr>` : ""}
+            
+            ${gst.cgst2_5 > 0 ? `<tr><th>CGST (2.5%):</th><td>₹${gst.cgst2_5.toFixed(2)}</td></tr>` : ""}
+            ${gst.sgst2_5 > 0 ? `<tr><th>SGST (2.5%):</th><td>₹${gst.sgst2_5.toFixed(2)}</td></tr>` : ""}
+            ${gst.cgst9 > 0 ? `<tr><th>CGST (9%):</th><td>₹${gst.cgst9.toFixed(2)}</td></tr>` : ""}
+            ${gst.sgst9 > 0 ? `<tr><th>SGST (9%):</th><td>₹${gst.sgst9.toFixed(2)}</td></tr>` : ""}
+            ${gst.igst5 > 0 ? `<tr><th>IGST (5%):</th><td>₹${gst.igst5.toFixed(2)}</td></tr>` : ""}
+            ${gst.igst18 > 0 ? `<tr><th>IGST (18%):</th><td>₹${gst.igst18.toFixed(2)}</td></tr>` : ""}
+
+            <tr style="border-top: 1px solid #ddd;">
+              <th><strong>Order Total:</strong></th>
+              <td><strong>₹${order.total}</strong></td>
+            </tr>
+					</tbody>
+				</table>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
 </body>
 </html>`;
 
