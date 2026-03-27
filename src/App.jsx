@@ -251,19 +251,38 @@ const WooCommerceGSTDashboard = () => {
         return;
       }
 
-      // Step 2: fire ALL remaining pages simultaneously — zero intermediate state updates
-      const remainingPromises = [];
-      for (let page = 2; page <= totalPages; page++) {
-        remainingPromises.push(
-          fetch(`${baseUrl}&page=${page}`, { headers }).then((res) => {
-            if (!res.ok) throw new Error(`Failed to fetch orders (page ${page})`);
-            return res.json().then((data) => ({ page, data }));
-          })
-        );
+      // Step 2: fetch remaining pages in chunks to avoid 503 server overload (rate limits)
+      const CONCURRENCY_LIMIT = 5; // Fetch 5 pages at a time
+      const remainingResults = [];
+      
+      setFetchProgress({ current: 1, total: totalPages });
+
+      for (let i = 2; i <= totalPages; i += CONCURRENCY_LIMIT) {
+        const chunkPromises = [];
+        for (let j = 0; j < CONCURRENCY_LIMIT && (i + j) <= totalPages; j++) {
+          const page = i + j;
+          chunkPromises.push(
+            fetch(`${baseUrl}&page=${page}`, { headers }).then((res) => {
+              if (!res.ok) {
+                // Return empty rather than crashing everything, in case of sporadic 503s
+                console.warn(`Failed to fetch order page ${page}, status: ${res.status}`);
+                return { page, data: [] }; 
+              }
+              return res.json().then((data) => ({ page, data }));
+            }).catch(() => {
+              return { page, data: [] };
+            })
+          );
+        }
+        
+        const chunkResults = await Promise.all(chunkPromises);
+        remainingResults.push(...chunkResults);
+        
+        // Update progress per chunk (updates UI without freezing it)
+        setFetchProgress({ current: Math.min(i + CONCURRENCY_LIMIT - 1, totalPages), total: totalPages });
       }
 
-      // Step 3: wait for ALL pages — then set orders ONCE
-      const remainingResults = await Promise.all(remainingPromises);
+      // Step 3: Combine and set orders ONCE to avoid expensive list re-renders
       const allResults = [{ page: 1, data: firstData }, ...remainingResults];
       allResults.sort((a, b) => a.page - b.page);
       const allOrders = allResults.flatMap((r) => r.data);
