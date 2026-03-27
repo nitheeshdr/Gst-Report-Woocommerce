@@ -20,10 +20,17 @@ const WooCommerceGSTDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Pre-populate from environment variables (set in .env)
+  const ENV_CONFIG = {
+    siteUrl: import.meta.env.VITE_WC_SITE_URL || "",
+    consumerKey: import.meta.env.VITE_WC_CONSUMER_KEY || "",
+    consumerSecret: import.meta.env.VITE_WC_CONSUMER_SECRET || ""
+  };
+
   const [config, setConfig] = useState({
-    siteUrl: "",
-    consumerKey: "",
-    consumerSecret: ""
+    siteUrl: ENV_CONFIG.siteUrl,
+    consumerKey: ENV_CONFIG.consumerKey,
+    consumerSecret: ENV_CONFIG.consumerSecret
   });
   const [isConfigured, setIsConfigured] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -95,7 +102,16 @@ const WooCommerceGSTDashboard = () => {
     await store.delete("main");
   };
 
-  // Load saved config
+  // In dev mode, use the Vite proxy path to avoid CORS.
+  // In production, call the store URL directly.
+  const getApiBase = (cfg) => {
+    if (import.meta.env.DEV) {
+      return "/wc-api"; // proxied to https://naturesjoystore.com by vite.config.js
+    }
+    return (cfg || config).siteUrl.replace(/\/$/, "");
+  };
+
+  // Load saved config; fall back to env-var credentials if nothing is stored
   useEffect(() => {
     const loadSavedConfig = async () => {
       const savedConfig = await loadConfigFromDB();
@@ -106,9 +122,13 @@ const WooCommerceGSTDashboard = () => {
           consumerSecret: savedConfig.consumerSecret
         });
         setIsConfigured(true);
+      } else if (ENV_CONFIG.siteUrl && ENV_CONFIG.consumerKey && ENV_CONFIG.consumerSecret) {
+        // Auto-connect using credentials from .env
+        setIsConfigured(true);
       }
     };
     loadSavedConfig();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ========== PRODUCT MAP & HELPERS ==========
@@ -172,13 +192,14 @@ const WooCommerceGSTDashboard = () => {
 
     try {
       const auth = btoa(`${config.consumerKey}:${config.consumerSecret}`);
+      const apiBase = getApiBase();
       let allProducts = [];
       let page = 1;
       let hasMore = true;
 
       while (hasMore) {
         const response = await fetch(
-          `${config.siteUrl.replace(/\/$/, "")}/wp-json/wc/v3/products?per_page=100&page=${page}`,
+          `${apiBase}/wp-json/wc/v3/products?per_page=100&page=${page}`,
           {
             headers: {
               Authorization: `Basic ${auth}`
@@ -212,7 +233,8 @@ const WooCommerceGSTDashboard = () => {
 
     try {
       const auth = btoa(`${config.consumerKey}:${config.consumerSecret}`);
-      const baseUrl = `${config.siteUrl.replace(/\/$/, "")}/wp-json/wc/v3/orders?per_page=100`;
+      const apiBase = getApiBase();
+      const baseUrl = `${apiBase}/wp-json/wc/v3/orders?per_page=100`;
 
       // Fetch first page to get total pages
       const firstResponse = await fetch(`${baseUrl}&page=1`, {
@@ -303,8 +325,9 @@ const WooCommerceGSTDashboard = () => {
 
     try {
       const auth = btoa(`${config.consumerKey}:${config.consumerSecret}`);
+      const apiBase = getApiBase();
       const response = await fetch(
-        `${config.siteUrl.replace(/\/$/, "")}/wp-json/wc/v3/products`,
+        `${apiBase}/wp-json/wc/v3/products`,
         {
           method: "POST",
           headers: {
