@@ -251,36 +251,44 @@ const WooCommerceGSTDashboard = () => {
         return;
       }
 
-      // Step 2: fetch remaining pages in chunks to avoid 503 server overload (rate limits)
-      const CONCURRENCY_LIMIT = 5; // Fetch 5 pages at a time
+      // Step 2: fetch remaining pages using a sliding-window worker pool
+      const CONCURRENCY_LIMIT = 6;
       const remainingResults = [];
+      let currentProgress = 1;
+      let nextPageIndex = 2;
       
-      setFetchProgress({ current: 1, total: totalPages });
+      setFetchProgress({ current: currentProgress, total: totalPages });
 
-      for (let i = 2; i <= totalPages; i += CONCURRENCY_LIMIT) {
-        const chunkPromises = [];
-        for (let j = 0; j < CONCURRENCY_LIMIT && (i + j) <= totalPages; j++) {
-          const page = i + j;
-          chunkPromises.push(
-            fetch(`${baseUrl}&page=${page}`, { headers }).then((res) => {
-              if (!res.ok) {
-                // Return empty rather than crashing everything, in case of sporadic 503s
-                console.warn(`Failed to fetch order page ${page}, status: ${res.status}`);
-                return { page, data: [] }; 
-              }
-              return res.json().then((data) => ({ page, data }));
-            }).catch(() => {
-              return { page, data: [] };
-            })
-          );
+      const fetchWorker = async () => {
+        while (nextPageIndex <= totalPages) {
+          const page = nextPageIndex++;
+          try {
+            const res = await fetch(`${baseUrl}&page=${page}`, { headers });
+            if (res.ok) {
+              const data = await res.json();
+              remainingResults.push({ page, data });
+            } else {
+              console.warn(`Failed to fetch order page ${page}, status: ${res.status}`);
+              remainingResults.push({ page, data: [] });
+            }
+          } catch (err) {
+            console.error(`Network error fetching page ${page}:`, err);
+            remainingResults.push({ page, data: [] });
+          } finally {
+            currentProgress++;
+            setFetchProgress({ current: Math.min(currentProgress, totalPages), total: totalPages });
+          }
         }
-        
-        const chunkResults = await Promise.all(chunkPromises);
-        remainingResults.push(...chunkResults);
-        
-        // Update progress per chunk (updates UI without freezing it)
-        setFetchProgress({ current: Math.min(i + CONCURRENCY_LIMIT - 1, totalPages), total: totalPages });
+      };
+
+      // Start workers up to the concurrency limit
+      const workers = [];
+      for (let i = 0; i < CONCURRENCY_LIMIT; i++) {
+        workers.push(fetchWorker());
       }
+
+      // Wait for all workers to finish their queues
+      await Promise.all(workers);
 
       // Step 3: Combine and set orders ONCE to avoid expensive list re-renders
       const allResults = [{ page: 1, data: firstData }, ...remainingResults];
