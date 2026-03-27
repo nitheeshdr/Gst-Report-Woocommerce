@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ShoppingCart, RefreshCw, Trash2, Download, Search, Filter } from 'lucide-react';
 
 import { getApiBase } from './utils/apiConfig';
-import { saveConfigToDB, loadConfigFromDB, clearConfigFromDB } from './utils/db';
+import { saveConfigToDB, loadConfigFromDB, clearConfigFromDB, saveDataToDB, loadDataFromDB } from './utils/db';
 import { exportToExcel, downloadInvoice } from './utils/exportHelpers';
 
 import ConfigScreen from './components/ConfigScreen';
@@ -68,7 +68,14 @@ const WooCommerceGSTDashboard = () => {
 
   const fetchProducts = async () => {
     if (!isConfigured) return;
-    setLoading(true);
+    
+    // Cache-First Load
+    const cachedProducts = await loadDataFromDB("products");
+    if (cachedProducts && cachedProducts.length > 0) {
+      setProducts(cachedProducts);
+    } else {
+      setLoading(true);
+    }
     setError("");
 
     try {
@@ -108,7 +115,7 @@ const WooCommerceGSTDashboard = () => {
         });
       }
 
-      const POOL_SIZE = 5;
+      const POOL_SIZE = 10;
       const remainingResults = [];
       let i = 0;
       
@@ -126,6 +133,7 @@ const WooCommerceGSTDashboard = () => {
       const allProducts = allResults.flatMap((r) => r.data);
 
       setProducts(allProducts);
+      await saveDataToDB("products", allProducts);
     } catch (err) {
       setError("Error fetching products: " + err.message);
     } finally {
@@ -135,7 +143,14 @@ const WooCommerceGSTDashboard = () => {
 
   const fetchOrders = async () => {
     if (!isConfigured) return;
-    setLoading(true);
+    
+    // Cache-First Load
+    const cachedOrders = await loadDataFromDB("orders");
+    if (cachedOrders && cachedOrders.length > 0) {
+      setOrders(cachedOrders);
+    } else {
+      setLoading(true);
+    }
     setError("");
     setFetchProgress({ current: 0, total: 0 });
 
@@ -180,7 +195,7 @@ const WooCommerceGSTDashboard = () => {
         });
       }
 
-      const POOL_SIZE = 5;
+      const POOL_SIZE = 10;
       const remainingResults = [];
       let i = 0;
       
@@ -198,6 +213,7 @@ const WooCommerceGSTDashboard = () => {
       const allOrders = allResults.flatMap((r) => r.data);
 
       setOrders(allOrders);
+      await saveDataToDB("orders", allOrders);
     } catch (err) {
       setError("Error fetching orders: " + err.message);
     } finally {
