@@ -102,13 +102,14 @@ const WooCommerceGSTDashboard = () => {
     await store.delete("main");
   };
 
-  // In dev mode, use the Vite proxy path to avoid CORS.
-  // In production, call the store URL directly.
+  // Route naturesjoystore.com requests through our proxy (/wc-api) to avoid CORS.
+  // This works in dev (via vite.config.js) and prod (via vercel.json rewrites).
   const getApiBase = (cfg) => {
-    if (import.meta.env.DEV) {
-      return "/wc-api"; // proxied to https://naturesjoystore.com by vite.config.js
+    const url = (cfg || config).siteUrl.replace(/\/$/, "");
+    if (url.includes("naturesjoystore.com")) {
+      return "/wc-api";
     }
-    return (cfg || config).siteUrl.replace(/\/$/, "");
+    return url;
   };
 
   // Load saved config; fall back to env-var credentials if nothing is stored
@@ -230,19 +231,16 @@ const WooCommerceGSTDashboard = () => {
 
     setLoading(true);
     setError("");
+    setFetchProgress({ current: 0, total: 0 });
 
     try {
       const auth = btoa(`${config.consumerKey}:${config.consumerSecret}`);
       const apiBase = getApiBase();
+      const headers = { Authorization: `Basic ${auth}` };
       const baseUrl = `${apiBase}/wp-json/wc/v3/orders?per_page=100`;
 
-      // Fetch first page to get total pages
-      const firstResponse = await fetch(`${baseUrl}&page=1`, {
-          headers: {
-            Authorization: `Basic ${auth}`
-          }
-      });
-
+      // Step 1: fetch page 1 to discover total page count
+      const firstResponse = await fetch(`${baseUrl}&page=1`, { headers });
       if (!firstResponse.ok) throw new Error("Failed to fetch orders (page 1)");
 
       const firstData = await firstResponse.json();
@@ -250,71 +248,36 @@ const WooCommerceGSTDashboard = () => {
 
       if (totalPages === 1) {
         setOrders(firstData);
-        setFetchProgress({ current: 0, total: 0 });
-        setLoading(false);
         return;
       }
 
-      // Optimized: Fetch all pages in parallel for maximum speed
-      // Batch progress updates using requestAnimationFrame to reduce re-renders
-      let completedCount = 1; // Page 1 is already done
-      let lastUpdateTime = 0;
-      const UPDATE_INTERVAL = 100; // Update progress max once per 100ms
-
-      const scheduleProgressUpdate = (count) => {
-        const now = Date.now();
-        if (now - lastUpdateTime >= UPDATE_INTERVAL || count === totalPages) {
-          lastUpdateTime = now;
-          setFetchProgress({ current: count, total: totalPages });
-        }
-      };
-
-      // Create all fetch promises at once for maximum parallelism
-      const allPromises = [];
-      
-      // Add page 1 data as resolved promise
-      allPromises.push(Promise.resolve({ page: 1, data: firstData }));
-      scheduleProgressUpdate(1);
-
-      // Create promises for all remaining pages - all start fetching immediately
+      // Step 2: fire ALL remaining pages simultaneously — zero intermediate state updates
+      const remainingPromises = [];
       for (let page = 2; page <= totalPages; page++) {
-        allPromises.push(
-          fetch(`${baseUrl}&page=${page}`, {
-                headers: {
-                  Authorization: `Basic ${auth}`
-                }
+        remainingPromises.push(
+          fetch(`${baseUrl}&page=${page}`, { headers }).then((res) => {
+            if (!res.ok) throw new Error(`Failed to fetch orders (page ${page})`);
+            return res.json().then((data) => ({ page, data }));
           })
-            .then(async (response) => {
-              if (!response.ok) throw new Error(`Failed to fetch orders (page ${page})`);
-              const data = await response.json();
-              completedCount++;
-              scheduleProgressUpdate(completedCount);
-              return { page, data };
-            })
-            .catch((err) => {
-              completedCount++;
-              scheduleProgressUpdate(completedCount);
-              throw err;
-            })
         );
       }
 
-      // Wait for all pages to complete in parallel
-      const allResults = await Promise.all(allPromises);
-      
-      // Sort by page number to maintain order, then flatten
+      // Step 3: wait for ALL pages — then set orders ONCE
+      const remainingResults = await Promise.all(remainingPromises);
+      const allResults = [{ page: 1, data: firstData }, ...remainingResults];
       allResults.sort((a, b) => a.page - b.page);
-      const allOrders = allResults.flatMap((result) => result.data);
+      const allOrders = allResults.flatMap((r) => r.data);
 
       setOrders(allOrders);
-      setFetchProgress({ current: 0, total: 0 });
     } catch (err) {
       setError("Error fetching orders: " + err.message);
-      setFetchProgress({ current: 0, total: 0 });
     } finally {
+      setFetchProgress({ current: 0, total: 0 });
       setLoading(false);
     }
   };
+
+
 
   // ========== ADD PRODUCT ==========
   const addProduct = async () => {
