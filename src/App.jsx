@@ -74,21 +74,57 @@ const WooCommerceGSTDashboard = () => {
     try {
       const auth = btoa(`${config.consumerKey}:${config.consumerSecret}`);
       const apiBase = getApiBase(config, ENV_CONFIG);
-      let allProducts = [];
-      let page = 1;
-      let hasMore = true;
+      const headers = { Authorization: `Basic ${auth}` };
+      const baseUrl = `${apiBase}/wp-json/wc/v3/products?per_page=100`;
 
-      while (hasMore) {
-        const response = await fetch(`${apiBase}/wp-json/wc/v3/products?per_page=100&page=${page}`, {
-          headers: { Authorization: `Basic ${auth}` }
-        });
-        if (!response.ok) throw new Error(`Failed to fetch products (page ${page})`);
-        const data = await response.json();
-        allProducts = [...allProducts, ...data];
-        const totalPages = parseInt(response.headers.get("X-WP-TotalPages") || "1");
-        hasMore = page < totalPages;
-        page++;
+      const firstResponse = await fetch(`${baseUrl}&page=1`, { headers });
+      if (!firstResponse.ok) throw new Error("Failed to fetch initial products");
+
+      const firstData = await firstResponse.json();
+      const totalPages = parseInt(firstResponse.headers.get("X-WP-TotalPages") || "1");
+
+      if (totalPages === 1) {
+        setProducts(firstData);
+        setLoading(false);
+        return;
       }
+
+      const tasks = [];
+      for (let page = 2; page <= totalPages; page++) {
+        tasks.push(async () => {
+          let retries = 3;
+          while (retries > 0) {
+            try {
+              const res = await fetch(`${baseUrl}&page=${page}`, { headers });
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const data = await res.json();
+              return { page, data };
+            } catch (err) {
+              retries--;
+              if (retries === 0) throw new Error(`Failed page ${page} after 3 retries: ${err.message}`);
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
+        });
+      }
+
+      const POOL_SIZE = 5;
+      const remainingResults = [];
+      let i = 0;
+      
+      const workers = Array(POOL_SIZE).fill(null).map(async () => {
+        while (i < tasks.length) {
+          const taskIndex = i++;
+          const result = await tasks[taskIndex]();
+          remainingResults.push(result);
+        }
+      });
+      await Promise.all(workers);
+
+      const allResults = [{ page: 1, data: firstData }, ...remainingResults];
+      allResults.sort((a, b) => a.page - b.page);
+      const allProducts = allResults.flatMap((r) => r.data);
+
       setProducts(allProducts);
     } catch (err) {
       setError("Error fetching products: " + err.message);
