@@ -37,6 +37,13 @@ const WooCommerceGSTDashboard = () => {
   const [dateFilter, setDateFilter] = useState({ start: "", end: "" });
   const [selectedCustomer, setSelectedCustomer] = useState("all");
   const [sortOrder, setSortOrder] = useState("newest"); // "newest" or "oldest"
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+
+  // Reset page to 1 whenever a filter or tab changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, dateFilter, selectedCustomer, sortOrder]);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -897,6 +904,42 @@ const WooCommerceGSTDashboard = () => {
 
   const stats = calculateStats();
 
+  // ========== PAGINATION HELPERS ==========
+  const paginatedOrders = useMemo(() => {
+    return filteredOrders.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [filteredOrders, currentPage]);
+  const totalOrderPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE) || 1;
+
+  const paginatedProducts = useMemo(() => {
+    return products.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [products, currentPage]);
+  const totalProductPages = Math.ceil(products.length / ITEMS_PER_PAGE) || 1;
+
+  const renderPagination = (totalPages, label) => {
+    if (totalPages <= 1) return null;
+    return (
+      <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4 rounded-lg shadow">
+        <div className="flex flex-1 justify-between sm:hidden">
+          <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Previous</button>
+          <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">Next</button>
+        </div>
+        <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+          <div><p className="text-sm text-gray-700">Showing page <span className="font-medium">{currentPage}</span> of <span className="font-medium">{totalPages}</span> {label}</p></div>
+          <div>
+            <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+              <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50">
+                <span>Previous</span>
+              </button>
+              <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 disabled:opacity-50">
+                <span>Next</span>
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ========== RENDER ==========
   if (!isConfigured) {
     return (
@@ -1192,8 +1235,9 @@ const WooCommerceGSTDashboard = () => {
             ) : (
               <>
                 {activeTab === "gst-report" && (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-xs">
+                  <div className="flex flex-col">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200 text-xs">
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
@@ -1219,7 +1263,7 @@ const WooCommerceGSTDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredOrders.flatMap((order) => {
+                        {paginatedOrders.flatMap((order) => {
                           const dcNo = order.meta_data?.find((m) => m.key === "_dc_number")?.value || "-";
                           const gstin = order.meta_data?.find((m) => m.key === "_billing_gstin" || m.key === "gstin")?.value || "N/A";
                           const orderSubtotal = calcSubtotal(order);
@@ -1334,6 +1378,8 @@ const WooCommerceGSTDashboard = () => {
                         })}
                       </tbody>
                     </table>
+                    </div>
+                    {renderPagination(totalOrderPages, "(orders calculated in this table)")}
                   </div>
                 )}
 
@@ -1423,7 +1469,7 @@ const WooCommerceGSTDashboard = () => {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {products.map((product) => {
+                          {paginatedProducts.map((product) => {
                             const gstRate = product.meta_data?.find((m) => m.key === "_gst_rate")?.value || "N/A";
                             const hsnCode = product.meta_data?.find((m) => m.key === "_hsn_code" || m.key === "hsn")?.value || "N/A";
 
@@ -1451,12 +1497,14 @@ const WooCommerceGSTDashboard = () => {
                         </tbody>
                       </table>
                     </div>
+                    {renderPagination(totalProductPages, "products")}
                   </div>
                 )}
 
                 {activeTab === "orders" && (
-                  <div className="space-y-4">
-                    {filteredOrders.map((order) => {
+                  <div className="flex flex-col space-y-4">
+                    <div className="space-y-4">
+                    {paginatedOrders.map((order) => {
                       const gst = calculateGST(order);
                       return (
                         <div key={order.id} className="border rounded-lg p-6 hover:shadow-md transition">
@@ -1527,6 +1575,8 @@ const WooCommerceGSTDashboard = () => {
                         </div>
                       );
                     })}
+                    </div>
+                    {renderPagination(totalOrderPages, "orders")}
                   </div>
                 )}
               </>
