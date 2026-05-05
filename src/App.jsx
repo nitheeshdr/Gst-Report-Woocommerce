@@ -99,23 +99,29 @@ const WooCommerceGSTDashboard = () => {
       const tasks = [];
       for (let page = 2; page <= totalPages; page++) {
         tasks.push(async () => {
-          let retries = 3;
+          let retries = 5;
           while (retries > 0) {
             try {
               const res = await fetch(`${baseUrl}&page=${page}`, { headers });
+              if (res.status === 429) {
+                 const waitTime = parseInt(res.headers.get("retry-after") || "3") * 1000;
+                 await new Promise(r => setTimeout(r, waitTime));
+                 retries--;
+                 continue;
+              }
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               const data = await res.json();
               return { page, data };
             } catch (err) {
               retries--;
-              if (retries === 0) throw new Error(`Failed page ${page} after 3 retries: ${err.message}`);
-              await new Promise(r => setTimeout(r, 1000));
+              if (retries === 0) throw new Error(`Failed page ${page} after retries: ${err.message}`);
+              await new Promise(r => setTimeout(r, 2000));
             }
           }
         });
       }
 
-      const POOL_SIZE = 10;
+      const POOL_SIZE = 3;
       const remainingResults = [];
       let i = 0;
       
@@ -178,24 +184,30 @@ const WooCommerceGSTDashboard = () => {
       const tasks = [];
       for (let page = 2; page <= totalPages; page++) {
         tasks.push(async () => {
-          let retries = 3;
+          let retries = 5;
           while (retries > 0) {
             try {
               const res = await fetch(`${baseUrl}&page=${page}`, { headers });
+              if (res.status === 429) {
+                 const waitTime = parseInt(res.headers.get("retry-after") || "3") * 1000;
+                 await new Promise(r => setTimeout(r, waitTime));
+                 retries--;
+                 continue;
+              }
               if (!res.ok) throw new Error(`HTTP ${res.status}`);
               const data = await res.json();
               setFetchProgress(p => ({ ...p, current: p.current + 1 }));
               return { page, data };
             } catch (err) {
               retries--;
-              if (retries === 0) throw new Error(`Failed page ${page} after 3 retries: ${err.message}`);
-              await new Promise(r => setTimeout(r, 1000));
+              if (retries === 0) throw new Error(`Failed page ${page} after retries: ${err.message}`);
+              await new Promise(r => setTimeout(r, 2000));
             }
           }
         });
       }
 
-      const POOL_SIZE = 10;
+      const POOL_SIZE = 3;
       const remainingResults = [];
       let i = 0;
       
