@@ -99,13 +99,15 @@ const WooCommerceGSTDashboard = () => {
       const tasks = [];
       for (let page = 2; page <= totalPages; page++) {
         tasks.push(async () => {
-          let retries = 5;
+          let retries = 10;
+          let backoff = 3000;
           while (retries > 0) {
             try {
               const res = await fetch(`${baseUrl}&page=${page}`, { headers });
               if (res.status === 429) {
-                 const waitTime = parseInt(res.headers.get("retry-after") || "3") * 1000;
+                 const waitTime = res.headers.get("retry-after") ? parseInt(res.headers.get("retry-after")) * 1000 : backoff;
                  await new Promise(r => setTimeout(r, waitTime));
+                 backoff = Math.min(backoff * 1.5, 15000);
                  retries--;
                  continue;
               }
@@ -121,7 +123,7 @@ const WooCommerceGSTDashboard = () => {
         });
       }
 
-      const POOL_SIZE = 3;
+      const POOL_SIZE = 2;
       const remainingResults = [];
       let i = 0;
       
@@ -184,13 +186,15 @@ const WooCommerceGSTDashboard = () => {
       const tasks = [];
       for (let page = 2; page <= totalPages; page++) {
         tasks.push(async () => {
-          let retries = 5;
+          let retries = 10;
+          let backoff = 3000;
           while (retries > 0) {
             try {
               const res = await fetch(`${baseUrl}&page=${page}`, { headers });
               if (res.status === 429) {
-                 const waitTime = parseInt(res.headers.get("retry-after") || "3") * 1000;
+                 const waitTime = res.headers.get("retry-after") ? parseInt(res.headers.get("retry-after")) * 1000 : backoff;
                  await new Promise(r => setTimeout(r, waitTime));
+                 backoff = Math.min(backoff * 1.5, 15000);
                  retries--;
                  continue;
               }
@@ -207,7 +211,7 @@ const WooCommerceGSTDashboard = () => {
         });
       }
 
-      const POOL_SIZE = 3;
+      const POOL_SIZE = 2;
       const remainingResults = [];
       let i = 0;
       
