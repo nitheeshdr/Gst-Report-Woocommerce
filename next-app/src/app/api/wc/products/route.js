@@ -1,7 +1,6 @@
-export const maxDuration = 60;
-
+// Fetches a single page — stays well within Vercel Hobby's 10s limit.
 export async function POST(request) {
-  const { siteUrl, consumerKey, consumerSecret } = await request.json();
+  const { siteUrl, consumerKey, consumerSecret, page = 1 } = await request.json();
 
   if (!siteUrl || !consumerKey || !consumerSecret) {
     return Response.json({ error: 'Missing credentials' }, { status: 400 });
@@ -9,51 +8,29 @@ export async function POST(request) {
 
   const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64');
   const headers = { Authorization: `Basic ${auth}` };
-  const base = siteUrl.replace(/\/$/, '');
-  const baseUrl = `${base}/wp-json/wc/v3/products?per_page=100`;
+  const url = `${siteUrl.replace(/\/$/, '')}/wp-json/wc/v3/products?per_page=100&page=${page}`;
 
-  let backoff = 3000;
+  let backoff = 2000;
+  let retries = 4;
 
-  const fetchPage = async (page) => {
-    let retries = 8;
-    while (retries > 0) {
-      const res = await fetch(`${baseUrl}&page=${page}`, { headers, cache: 'no-store' });
-      if (res.status === 429) {
-        const waitMs = res.headers.get('retry-after')
-          ? parseInt(res.headers.get('retry-after')) * 1000
-          : backoff;
-        backoff = Math.min(backoff * 2, 20000);
-        await new Promise(r => setTimeout(r, waitMs));
-        retries--;
-        continue;
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status} on page ${page}`);
-      backoff = 3000;
-      return res;
+  while (retries > 0) {
+    const res = await fetch(url, { headers, cache: 'no-store' });
+    if (res.status === 429) {
+      const waitMs = res.headers.get('retry-after')
+        ? parseInt(res.headers.get('retry-after')) * 1000
+        : backoff;
+      backoff = Math.min(backoff * 2, 8000);
+      retries--;
+      await new Promise(r => setTimeout(r, waitMs));
+      continue;
     }
-    throw new Error(`Exceeded retries on page ${page}`);
-  };
-
-  try {
-    const firstRes = await fetchPage(1);
-    const firstData = await firstRes.json();
-    const totalPages = parseInt(firstRes.headers.get('X-WP-TotalPages') || '1');
-
-    if (totalPages === 1) {
-      return Response.json({ data: firstData });
+    if (!res.ok) {
+      return Response.json({ error: `WooCommerce returned HTTP ${res.status}` }, { status: res.status });
     }
-
-    const allData = [...firstData];
-
-    for (let page = 2; page <= totalPages; page++) {
-      await new Promise(r => setTimeout(r, 500));
-      const res = await fetchPage(page);
-      const data = await res.json();
-      allData.push(...data);
-    }
-
-    return Response.json({ data: allData });
-  } catch (err) {
-    return Response.json({ error: err.message }, { status: 500 });
+    const data = await res.json();
+    const totalPages = parseInt(res.headers.get('X-WP-TotalPages') || '1');
+    return Response.json({ data, totalPages });
   }
+
+  return Response.json({ error: 'Rate limited — exceeded retries' }, { status: 429 });
 }

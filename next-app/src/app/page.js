@@ -25,6 +25,7 @@ const WooCommerceGSTDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0 });
   const [activeTab, setActiveTab] = useState("gst-report");
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -71,6 +72,17 @@ const WooCommerceGSTDashboard = () => {
     consumerSecret: config.consumerSecret || ENV_CONFIG.consumerSecret,
   });
 
+  const fetchPageFromApi = async (endpoint, page) => {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...getWcCredentials(), page }),
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+    return json; // { data, totalPages }
+  };
+
   const fetchProducts = async () => {
     if (!isConfigured) return;
 
@@ -83,15 +95,17 @@ const WooCommerceGSTDashboard = () => {
     setError("");
 
     try {
-      const res = await fetch("/api/wc/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(getWcCredentials()),
-      });
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      setProducts(json.data);
-      await saveDataToDB("products", json.data);
+      const first = await fetchPageFromApi("/api/wc/products", 1);
+      const allProducts = [...first.data];
+
+      for (let page = 2; page <= first.totalPages; page++) {
+        await new Promise(r => setTimeout(r, 600));
+        const { data } = await fetchPageFromApi("/api/wc/products", page);
+        allProducts.push(...data);
+      }
+
+      setProducts(allProducts);
+      await saveDataToDB("products", allProducts);
     } catch (err) {
       setError("Error fetching products: " + err.message);
     } finally {
@@ -109,20 +123,26 @@ const WooCommerceGSTDashboard = () => {
       setLoading(true);
     }
     setError("");
+    setFetchProgress({ current: 0, total: 0 });
 
     try {
-      const res = await fetch("/api/wc/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(getWcCredentials()),
-      });
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      setOrders(json.data);
-      await saveDataToDB("orders", json.data);
+      const first = await fetchPageFromApi("/api/wc/orders", 1);
+      const allOrders = [...first.data];
+      setFetchProgress({ current: 1, total: first.totalPages });
+
+      for (let page = 2; page <= first.totalPages; page++) {
+        await new Promise(r => setTimeout(r, 600));
+        const { data } = await fetchPageFromApi("/api/wc/orders", page);
+        allOrders.push(...data);
+        setFetchProgress({ current: page, total: first.totalPages });
+      }
+
+      setOrders(allOrders);
+      await saveDataToDB("orders", allOrders);
     } catch (err) {
       setError("Error fetching orders: " + err.message);
     } finally {
+      setFetchProgress({ current: 0, total: 0 });
       setLoading(false);
     }
   };
@@ -133,9 +153,9 @@ const WooCommerceGSTDashboard = () => {
     setError("");
 
     try {
-      const auth = btoa(`${config.consumerKey}:${config.consumerSecret}`);
-      const apiBase = getApiBase(config, ENV_CONFIG);
-      const response = await fetch(`${apiBase}/wp-json/wc/v3/products`, {
+      const creds = getWcCredentials();
+      const auth = btoa(`${creds.consumerKey}:${creds.consumerSecret}`);
+      const response = await fetch(`${creds.siteUrl}/wp-json/wc/v3/products`, {
         method: "POST",
         headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -310,6 +330,25 @@ const WooCommerceGSTDashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {fetchProgress.total > 0 && (
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-blue-900">
+                Fetching orders... Page {fetchProgress.current} of {fetchProgress.total}
+              </span>
+              <span className="text-sm text-blue-700">
+                {Math.round((fetchProgress.current / fetchProgress.total) * 100)}%
+              </span>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2">
+              <div
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${(fetchProgress.current / fetchProgress.total) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         <StatsCards stats={stats} />
 
         <div className="bg-white rounded-lg shadow p-6 mb-8">
