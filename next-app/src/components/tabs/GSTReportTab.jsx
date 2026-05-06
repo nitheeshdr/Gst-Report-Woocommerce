@@ -9,29 +9,29 @@ const GSTReportTab = ({ paginatedOrders, productMap, renderPagination, downloadI
         <table className="min-w-full divide-y divide-gray-200 text-xs">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Inv. No</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">DC. No</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">GSTIN</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">State</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">HSN</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Supply @ 18%</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">9% CGST</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">9% SGST</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">18% IGST</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Supply @ 5%</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">2.5% CGST</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">2.5% SGST</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">5% IGST</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">0% Tax</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">TOTAL</th>
-              <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">Date</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">Inv. No</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">DC. No</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">Customer</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">GSTIN</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">State</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">HSN</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">Qty</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">Subtotal</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">Supply @ 18%</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">9% CGST</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">9% SGST</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">18% IGST</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">Supply @ 5%</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">2.5% CGST</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">2.5% SGST</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">5% IGST</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">0% Tax</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">TOTAL</th>
+              <th className="px-2 py-2 text-left text-xs font-medium text-black uppercase">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white divide-y divide-gray-200 text-black">
             {paginatedOrders.flatMap((order) => {
               const dcNo = order.meta_data?.find((m) => m.key === "_dc_number")?.value || "-";
               const gstin = order.meta_data?.find((m) => m.key === "_billing_gstin" || m.key === "gstin")?.value || "N/A";

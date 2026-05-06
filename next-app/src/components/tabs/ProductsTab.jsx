@@ -86,14 +86,14 @@ const ProductsTab = ({
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Image</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">HSN Code</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST Rate</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Image</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">SKU</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">HSN Code</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Price</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Stock</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">GST Rate</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">Status</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -112,12 +112,12 @@ const ProductsTab = ({
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4"><div className="text-sm font-medium text-gray-900">{product.name}</div></td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{product.sku || "N/A"}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{hsnCode}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">₹{product.price}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{product.stock_quantity !== null ? product.stock_quantity : "N/A"}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{gstRate}%</td>
+                  <td className="px-6 py-4"><div className="text-sm font-medium text-black">{product.name}</div></td>
+                  <td className="px-6 py-4 text-sm text-black">{product.sku || "N/A"}</td>
+                  <td className="px-6 py-4 text-sm text-black">{hsnCode}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-black">₹{product.price}</td>
+                  <td className="px-6 py-4 text-sm text-black">{product.stock_quantity !== null ? product.stock_quantity : "N/A"}</td>
+                  <td className="px-6 py-4 text-sm text-black">{gstRate}%</td>
                   <td className="px-6 py-4"><span className={`px-2 py-1 text-xs rounded-full ${product.stock_status === "instock" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>{product.stock_status}</span></td>
                 </tr>
               );

@@ -20,25 +20,24 @@ const ENV_CONFIG = {
 };
 
 const fetchWithRetry = async (url, headers, pageStr) => {
-  let retries = 20; // 20 retries to handle long rate limit blocks
-  let backoff = 5000; // Start backoff at 5s
+  let retries = 10;
+  let backoff = 2000;
   while (retries > 0) {
     try {
-      await new Promise(r => setTimeout(r, 1500)); // Pace much slower (1.5s per request) to avoid hitting limits
       const res = await fetch(url, { headers });
       if (res.status === 429) {
-         const waitTime = res.headers.get("retry-after") ? parseInt(res.headers.get("retry-after")) * 1000 : backoff;
-         await new Promise(r => setTimeout(r, waitTime));
-         backoff = Math.min(backoff * 1.5, 30000); // Backoff up to 30s
-         retries--;
-         continue;
+        const waitTime = res.headers.get("retry-after") ? parseInt(res.headers.get("retry-after")) * 1000 : backoff;
+        await new Promise(r => setTimeout(r, waitTime));
+        backoff = Math.min(backoff * 2, 30000);
+        retries--;
+        continue;
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res;
     } catch (err) {
       retries--;
       if (retries === 0) throw new Error(`Failed ${pageStr} after retries: ${err.message}`);
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 1000));
     }
   }
   throw new Error(`Failed ${pageStr}: Exceeded maximum retries for rate limiting.`);
@@ -129,10 +128,10 @@ const WooCommerceGSTDashboard = () => {
         });
       }
 
-      const POOL_SIZE = 1; // Strict sequential fetching
+      const POOL_SIZE = 3;
       const remainingResults = [];
       let i = 0;
-      
+
       const workers = Array(POOL_SIZE).fill(null).map(async () => {
         while (i < tasks.length) {
           const taskIndex = i++;
@@ -197,10 +196,10 @@ const WooCommerceGSTDashboard = () => {
         });
       }
 
-      const POOL_SIZE = 1; // Strict sequential fetching
+      const POOL_SIZE = 3;
       const remainingResults = [];
       let i = 0;
-      
+
       const workers = Array(POOL_SIZE).fill(null).map(async () => {
         while (i < tasks.length) {
           const taskIndex = i++;
