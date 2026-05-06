@@ -19,15 +19,20 @@ const ENV_CONFIG = {
   consumerSecret: process.env.NEXT_PUBLIC_WC_CONSUMER_SECRET || ""
 };
 
-const fetchWithRetry = async (url, headers, pageStr) => {
+// rateLimitRef is shared across all concurrent workers so one 429 pauses everyone
+const fetchWithRetry = async (url, headers, pageStr, rateLimitRef) => {
   let retries = 10;
   let backoff = 2000;
   while (retries > 0) {
+    const waitNeeded = rateLimitRef.until - Date.now();
+    if (waitNeeded > 0) await new Promise(r => setTimeout(r, waitNeeded));
     try {
       const res = await fetch(url, { headers });
       if (res.status === 429) {
-        const waitTime = res.headers.get("retry-after") ? parseInt(res.headers.get("retry-after")) * 1000 : backoff;
-        await new Promise(r => setTimeout(r, waitTime));
+        const waitTime = res.headers.get("retry-after")
+          ? parseInt(res.headers.get("retry-after")) * 1000
+          : backoff;
+        rateLimitRef.until = Math.max(rateLimitRef.until, Date.now() + waitTime);
         backoff = Math.min(backoff * 2, 30000);
         retries--;
         continue;
@@ -109,7 +114,8 @@ const WooCommerceGSTDashboard = () => {
       const headers = { Authorization: `Basic ${auth}` };
       const baseUrl = `${apiBase}/wp-json/wc/v3/products?per_page=100`;
 
-      const firstResponse = await fetchWithRetry(`${baseUrl}&page=1`, headers, "initial products");
+      const rateLimitRef = { until: 0 };
+      const firstResponse = await fetchWithRetry(`${baseUrl}&page=1`, headers, "initial products", rateLimitRef);
       const firstData = await firstResponse.json();
       const totalPages = parseInt(firstResponse.headers.get("X-WP-TotalPages") || "1");
 
@@ -122,13 +128,13 @@ const WooCommerceGSTDashboard = () => {
       const tasks = [];
       for (let page = 2; page <= totalPages; page++) {
         tasks.push(async () => {
-          const res = await fetchWithRetry(`${baseUrl}&page=${page}`, headers, `page ${page}`);
+          const res = await fetchWithRetry(`${baseUrl}&page=${page}`, headers, `page ${page}`, rateLimitRef);
           const data = await res.json();
           return { page, data };
         });
       }
 
-      const POOL_SIZE = 3;
+      const POOL_SIZE = 2;
       const remainingResults = [];
       let i = 0;
 
@@ -137,6 +143,7 @@ const WooCommerceGSTDashboard = () => {
           const taskIndex = i++;
           const result = await tasks[taskIndex]();
           remainingResults.push(result);
+          await new Promise(r => setTimeout(r, 300)); // brief pause between requests
         }
       });
       await Promise.all(workers);
@@ -173,7 +180,8 @@ const WooCommerceGSTDashboard = () => {
       const headers = { Authorization: `Basic ${auth}` };
       const baseUrl = `${apiBase}/wp-json/wc/v3/orders?per_page=100`;
 
-      const firstResponse = await fetchWithRetry(`${baseUrl}&page=1`, headers, "initial orders");
+      const rateLimitRef = { until: 0 };
+      const firstResponse = await fetchWithRetry(`${baseUrl}&page=1`, headers, "initial orders", rateLimitRef);
       const firstData = await firstResponse.json();
       const totalPages = parseInt(firstResponse.headers.get("X-WP-TotalPages") || "1");
 
@@ -189,14 +197,14 @@ const WooCommerceGSTDashboard = () => {
       const tasks = [];
       for (let page = 2; page <= totalPages; page++) {
         tasks.push(async () => {
-          const res = await fetchWithRetry(`${baseUrl}&page=${page}`, headers, `page ${page}`);
+          const res = await fetchWithRetry(`${baseUrl}&page=${page}`, headers, `page ${page}`, rateLimitRef);
           const data = await res.json();
           setFetchProgress(p => ({ ...p, current: p.current + 1 }));
           return { page, data };
         });
       }
 
-      const POOL_SIZE = 3;
+      const POOL_SIZE = 2;
       const remainingResults = [];
       let i = 0;
 
@@ -205,6 +213,7 @@ const WooCommerceGSTDashboard = () => {
           const taskIndex = i++;
           const result = await tasks[taskIndex]();
           remainingResults.push(result);
+          await new Promise(r => setTimeout(r, 300)); // brief pause between requests
         }
       });
       await Promise.all(workers);
@@ -383,7 +392,7 @@ const WooCommerceGSTDashboard = () => {
                 className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
               >
                 <Download className="w-4 h-4" />
-                <span>Export CSV</span>
+                <span>Export Excel</span>
               </button>
               <button
                 onClick={() => { fetchProducts(); fetchOrders(); }}

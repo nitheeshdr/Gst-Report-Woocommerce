@@ -1,13 +1,13 @@
-import { 
-  calcSubtotal, 
-  calculateLineItemGST, 
-  calculateShippingGST, 
-  isOrderCancelled, 
-  getHSN, 
-  calculateGST 
+import * as XLSX from 'xlsx';
+import {
+  calcSubtotal,
+  calculateLineItemGST,
+  calculateShippingGST,
+  isOrderCancelled,
+  getHSN,
+  calculateGST
 } from './gstCalculator';
 
-// Export CSV (per line item GST)
 export const exportToExcel = (filteredOrders, productMap) => {
   const headers = [
     "Date",
@@ -40,7 +40,6 @@ export const exportToExcel = (filteredOrders, productMap) => {
     const customerName = `${order.billing?.first_name || ""} ${order.billing?.last_name || ""}`;
     const state = order.billing?.state || "";
 
-    // Calculate discount per item (proportional)
     const orderSubtotal = calcSubtotal(order);
     const orderDiscount = parseFloat(order.discount_total || 0);
     const discountRatio = orderSubtotal > 0 ? orderDiscount / orderSubtotal : 0;
@@ -49,95 +48,74 @@ export const exportToExcel = (filteredOrders, productMap) => {
       const lineGST = calculateLineItemGST(item, order);
       const hsn = getHSN(item, productMap);
       const itemSubtotal = parseFloat(item.subtotal || 0);
-      const itemDiscount = itemSubtotal * discountRatio;
-      const adjustedSubtotal = itemSubtotal - itemDiscount;
-      // Calculate item tax amount for total
+      const adjustedSubtotal = itemSubtotal - itemSubtotal * discountRatio;
       let itemTaxAmount = 0;
-      if (item.taxes && item.taxes.length > 0) {
-        item.taxes.forEach((tax) => {
-          itemTaxAmount += parseFloat(tax.total || 0);
-        });
-      }
-      const isCancelled = isOrderCancelled(order);
-      const multiplier = isCancelled ? -1 : 1;
+      item.taxes?.forEach((tax) => { itemTaxAmount += parseFloat(tax.total || 0); });
+      const multiplier = isOrderCancelled(order) ? -1 : 1;
       const lineTotal = (adjustedSubtotal + itemTaxAmount) * multiplier;
 
       rows.push([
-        orderDate,
-        order.id,
-        orderDate,
-        dcNo,
-        customerName,
-        gstin,
-        state,
-        hsn,
+        orderDate, order.id, orderDate, dcNo, customerName, gstin, state, hsn,
         item.quantity || 0,
-        adjustedSubtotal.toFixed(2),
-        lineGST.supply18.toFixed(2),
-        lineGST.cgst9.toFixed(2),
-        lineGST.sgst9.toFixed(2),
-        lineGST.igst18.toFixed(2),
-        lineGST.supply5.toFixed(2),
-        lineGST.cgst2_5.toFixed(2),
-        lineGST.sgst2_5.toFixed(2),
-        lineGST.igst5.toFixed(2),
-        lineGST.supply0.toFixed(2),
-        lineTotal.toFixed(2)
+        parseFloat(adjustedSubtotal.toFixed(2)),
+        parseFloat(lineGST.supply18.toFixed(2)),
+        parseFloat(lineGST.cgst9.toFixed(2)),
+        parseFloat(lineGST.sgst9.toFixed(2)),
+        parseFloat(lineGST.igst18.toFixed(2)),
+        parseFloat(lineGST.supply5.toFixed(2)),
+        parseFloat(lineGST.cgst2_5.toFixed(2)),
+        parseFloat(lineGST.sgst2_5.toFixed(2)),
+        parseFloat(lineGST.igst5.toFixed(2)),
+        parseFloat(lineGST.supply0.toFixed(2)),
+        parseFloat(lineTotal.toFixed(2))
       ]);
     });
 
-    // Add shipping as a separate line item if shipping exists
     const shippingTotal = parseFloat(order.shipping_total || 0);
     if (shippingTotal > 0) {
       const shippingGST = calculateShippingGST(order);
-      const isCancelled = isOrderCancelled(order);
-      const multiplier = isCancelled ? -1 : 1;
+      const multiplier = isOrderCancelled(order) ? -1 : 1;
       let shippingTaxAmount = 0;
-      if (order.shipping_lines) {
-        order.shipping_lines.forEach((shipping) => {
-          if (shipping.taxes && shipping.taxes.length > 0) {
-            shipping.taxes.forEach((tax) => {
-              shippingTaxAmount += parseFloat(tax.total || 0);
-            });
-          }
-        });
-      }
+      order.shipping_lines?.forEach((s) => s.taxes?.forEach((t) => { shippingTaxAmount += parseFloat(t.total || 0); }));
       const shippingLineTotal = (shippingTotal + shippingTaxAmount) * multiplier;
 
       rows.push([
-        orderDate,
-        order.id,
-        orderDate,
-        dcNo,
-        customerName,
-        gstin,
-        state,
-        "996812",
-        1,
-        shippingTotal.toFixed(2),
-        shippingGST.supply18.toFixed(2),
-        shippingGST.cgst9.toFixed(2),
-        shippingGST.sgst9.toFixed(2),
-        shippingGST.igst18.toFixed(2),
-        shippingGST.supply5.toFixed(2),
-        shippingGST.cgst2_5.toFixed(2),
-        shippingGST.sgst2_5.toFixed(2),
-        shippingGST.igst5.toFixed(2),
-        shippingGST.supply0.toFixed(2),
-        shippingLineTotal.toFixed(2)
+        orderDate, order.id, orderDate, dcNo, customerName, gstin, state, "996812", 1,
+        parseFloat(shippingTotal.toFixed(2)),
+        parseFloat(shippingGST.supply18.toFixed(2)),
+        parseFloat(shippingGST.cgst9.toFixed(2)),
+        parseFloat(shippingGST.sgst9.toFixed(2)),
+        parseFloat(shippingGST.igst18.toFixed(2)),
+        parseFloat(shippingGST.supply5.toFixed(2)),
+        parseFloat(shippingGST.cgst2_5.toFixed(2)),
+        parseFloat(shippingGST.sgst2_5.toFixed(2)),
+        parseFloat(shippingGST.igst5.toFixed(2)),
+        parseFloat(shippingGST.supply0.toFixed(2)),
+        parseFloat(shippingLineTotal.toFixed(2))
       ]);
     }
   });
 
-  const csvContent = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n");
+  const wsData = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `GST_Report_${new Date().toLocaleDateString("en-IN").replace(/\//g, "-")}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+  // Bold header row
+  const headerRange = XLSX.utils.decode_range(ws['!ref']);
+  for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+    const cellRef = XLSX.utils.encode_cell({ r: 0, c: col });
+    if (ws[cellRef]) ws[cellRef].s = { font: { bold: true } };
+  }
+
+  // Auto column widths
+  ws['!cols'] = headers.map((h, i) => ({
+    wch: Math.max(h.length, ...rows.map((r) => String(r[i] ?? '').length)) + 2
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "GST Report");
+
+  const date = new Date().toLocaleDateString("en-IN").replace(/\//g, "-");
+  XLSX.writeFile(wb, `GST_Report_${date}.xlsx`);
 };
 
 // Download invoice (fixed & uses getHSN + calcSubtotal)
