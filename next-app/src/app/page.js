@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ShoppingCart, RefreshCw, Trash2, Download, Search, Filter } from 'lucide-react';
 
-import { getApiBase } from '@/utils/apiConfig';
 import { saveConfigToDB, loadConfigFromDB, clearConfigFromDB, saveDataToDB, loadDataFromDB } from '@/utils/db';
 import { exportToExcel, downloadInvoice } from '@/utils/exportHelpers';
 
@@ -19,35 +18,6 @@ const ENV_CONFIG = {
   consumerSecret: process.env.NEXT_PUBLIC_WC_CONSUMER_SECRET || ""
 };
 
-// rateLimitRef is shared across all concurrent workers so one 429 pauses everyone
-const fetchWithRetry = async (url, headers, pageStr, rateLimitRef) => {
-  let retries = 10;
-  let backoff = 2000;
-  while (retries > 0) {
-    const waitNeeded = rateLimitRef.until - Date.now();
-    if (waitNeeded > 0) await new Promise(r => setTimeout(r, waitNeeded));
-    try {
-      const res = await fetch(url, { headers });
-      if (res.status === 429) {
-        const waitTime = res.headers.get("retry-after")
-          ? parseInt(res.headers.get("retry-after")) * 1000
-          : backoff;
-        rateLimitRef.until = Math.max(rateLimitRef.until, Date.now() + waitTime);
-        backoff = Math.min(backoff * 2, 30000);
-        retries--;
-        continue;
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res;
-    } catch (err) {
-      retries--;
-      if (retries === 0) throw new Error(`Failed ${pageStr} after retries: ${err.message}`);
-      await new Promise(r => setTimeout(r, 1000));
-    }
-  }
-  throw new Error(`Failed ${pageStr}: Exceeded maximum retries for rate limiting.`);
-};
-
 const WooCommerceGSTDashboard = () => {
   const [isConfigured, setIsConfigured] = useState(false);
   const [config, setConfig] = useState(ENV_CONFIG);
@@ -55,7 +25,6 @@ const WooCommerceGSTDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0 });
   const [activeTab, setActiveTab] = useState("gst-report");
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -96,10 +65,15 @@ const WooCommerceGSTDashboard = () => {
     return map;
   }, [products]);
 
+  const getWcCredentials = () => ({
+    siteUrl: (config.siteUrl || ENV_CONFIG.siteUrl || "").replace(/\/$/, ""),
+    consumerKey: config.consumerKey || ENV_CONFIG.consumerKey,
+    consumerSecret: config.consumerSecret || ENV_CONFIG.consumerSecret,
+  });
+
   const fetchProducts = async () => {
     if (!isConfigured) return;
-    
-    // Cache-First Load
+
     const cachedProducts = await loadDataFromDB("products");
     if (cachedProducts && cachedProducts.length > 0) {
       setProducts(cachedProducts);
@@ -109,51 +83,15 @@ const WooCommerceGSTDashboard = () => {
     setError("");
 
     try {
-      const auth = btoa(`${config.consumerKey}:${config.consumerSecret}`);
-      const apiBase = getApiBase(config, ENV_CONFIG);
-      const headers = { Authorization: `Basic ${auth}` };
-      const baseUrl = `${apiBase}/wp-json/wc/v3/products?per_page=100`;
-
-      const rateLimitRef = { until: 0 };
-      const firstResponse = await fetchWithRetry(`${baseUrl}&page=1`, headers, "initial products", rateLimitRef);
-      const firstData = await firstResponse.json();
-      const totalPages = parseInt(firstResponse.headers.get("X-WP-TotalPages") || "1");
-
-      if (totalPages === 1) {
-        setProducts(firstData);
-        setLoading(false);
-        return;
-      }
-
-      const tasks = [];
-      for (let page = 2; page <= totalPages; page++) {
-        tasks.push(async () => {
-          const res = await fetchWithRetry(`${baseUrl}&page=${page}`, headers, `page ${page}`, rateLimitRef);
-          const data = await res.json();
-          return { page, data };
-        });
-      }
-
-      const POOL_SIZE = 2;
-      const remainingResults = [];
-      let i = 0;
-
-      const workers = Array(POOL_SIZE).fill(null).map(async () => {
-        while (i < tasks.length) {
-          const taskIndex = i++;
-          const result = await tasks[taskIndex]();
-          remainingResults.push(result);
-          await new Promise(r => setTimeout(r, 300)); // brief pause between requests
-        }
+      const res = await fetch("/api/wc/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(getWcCredentials()),
       });
-      await Promise.all(workers);
-
-      const allResults = [{ page: 1, data: firstData }, ...remainingResults];
-      allResults.sort((a, b) => a.page - b.page);
-      const allProducts = allResults.flatMap((r) => r.data);
-
-      setProducts(allProducts);
-      await saveDataToDB("products", allProducts);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setProducts(json.data);
+      await saveDataToDB("products", json.data);
     } catch (err) {
       setError("Error fetching products: " + err.message);
     } finally {
@@ -163,8 +101,7 @@ const WooCommerceGSTDashboard = () => {
 
   const fetchOrders = async () => {
     if (!isConfigured) return;
-    
-    // Cache-First Load
+
     const cachedOrders = await loadDataFromDB("orders");
     if (cachedOrders && cachedOrders.length > 0) {
       setOrders(cachedOrders);
@@ -172,62 +109,20 @@ const WooCommerceGSTDashboard = () => {
       setLoading(true);
     }
     setError("");
-    setFetchProgress({ current: 0, total: 0 });
 
     try {
-      const auth = btoa(`${config.consumerKey}:${config.consumerSecret}`);
-      const apiBase = getApiBase(config, ENV_CONFIG);
-      const headers = { Authorization: `Basic ${auth}` };
-      const baseUrl = `${apiBase}/wp-json/wc/v3/orders?per_page=100`;
-
-      const rateLimitRef = { until: 0 };
-      const firstResponse = await fetchWithRetry(`${baseUrl}&page=1`, headers, "initial orders", rateLimitRef);
-      const firstData = await firstResponse.json();
-      const totalPages = parseInt(firstResponse.headers.get("X-WP-TotalPages") || "1");
-
-      setFetchProgress({ current: 1, total: totalPages });
-
-      if (totalPages === 1) {
-        setOrders(firstData);
-        setFetchProgress({ current: 0, total: 0 });
-        setLoading(false);
-        return;
-      }
-
-      const tasks = [];
-      for (let page = 2; page <= totalPages; page++) {
-        tasks.push(async () => {
-          const res = await fetchWithRetry(`${baseUrl}&page=${page}`, headers, `page ${page}`, rateLimitRef);
-          const data = await res.json();
-          setFetchProgress(p => ({ ...p, current: p.current + 1 }));
-          return { page, data };
-        });
-      }
-
-      const POOL_SIZE = 2;
-      const remainingResults = [];
-      let i = 0;
-
-      const workers = Array(POOL_SIZE).fill(null).map(async () => {
-        while (i < tasks.length) {
-          const taskIndex = i++;
-          const result = await tasks[taskIndex]();
-          remainingResults.push(result);
-          await new Promise(r => setTimeout(r, 300)); // brief pause between requests
-        }
+      const res = await fetch("/api/wc/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(getWcCredentials()),
       });
-      await Promise.all(workers);
-
-      const allResults = [{ page: 1, data: firstData }, ...remainingResults];
-      allResults.sort((a, b) => a.page - b.page);
-      const allOrders = allResults.flatMap((r) => r.data);
-
-      setOrders(allOrders);
-      await saveDataToDB("orders", allOrders);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      setOrders(json.data);
+      await saveDataToDB("orders", json.data);
     } catch (err) {
       setError("Error fetching orders: " + err.message);
     } finally {
-      setFetchProgress({ current: 0, total: 0 });
       setLoading(false);
     }
   };
@@ -415,25 +310,6 @@ const WooCommerceGSTDashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {fetchProgress.total > 0 && (
-          <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-blue-900">
-                Fetching orders... Page {fetchProgress.current} of {fetchProgress.total}
-              </span>
-              <span className="text-sm text-blue-700">
-                {Math.round((fetchProgress.current / fetchProgress.total) * 100)}%
-              </span>
-            </div>
-            <div className="w-full bg-blue-200 rounded-full h-2">
-              <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(fetchProgress.current / fetchProgress.total) * 100}%` }}
-              />
-            </div>
-          </div>
-        )}
-
         <StatsCards stats={stats} />
 
         <div className="bg-white rounded-lg shadow p-6 mb-8">
@@ -503,7 +379,7 @@ const WooCommerceGSTDashboard = () => {
           <div className="p-6">
             {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">{error}</div>}
 
-            {loading && fetchProgress.total === 0 ? (
+            {loading ? (
               <div className="text-center py-12">
                 <RefreshCw className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
                 <p className="text-gray-600">Loading data...</p>
