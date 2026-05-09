@@ -52,9 +52,17 @@ class GST_Calculator {
         $product_id   = $item->get_product_id();
         $ids          = array_filter( [ $variation_id, $product_id ] );
 
+        static $wc_product_cache = [];
+
         foreach ( $ids as $pid ) {
-            // Fall back to wc_get_product() for variation objects not in the map
-            $product = $product_map[ $pid ] ?? wc_get_product( $pid );
+            if ( isset( $product_map[ $pid ] ) ) {
+                $product = $product_map[ $pid ];
+            } else {
+                if ( ! array_key_exists( $pid, $wc_product_cache ) ) {
+                    $wc_product_cache[ $pid ] = wc_get_product( $pid );
+                }
+                $product = $wc_product_cache[ $pid ];
+            }
             if ( ! $product ) continue;
 
             // 1. meta key 'hsn'
@@ -67,7 +75,9 @@ class GST_Calculator {
 
             // 3. any product attribute whose name contains 'hsn' (case-insensitive)
             //    covers "HSN", "HSN Code", "HSN/SAC", "HSN No." etc.
+            //    WC_Product_Variation::get_attributes() returns strings, not objects — skip those.
             foreach ( $product->get_attributes() as $attr ) {
+                if ( ! is_object( $attr ) ) continue;
                 if ( stripos( $attr->get_name(), 'hsn' ) !== false ) {
                     $options = $attr->get_options();
                     if ( ! empty( $options ) ) {
