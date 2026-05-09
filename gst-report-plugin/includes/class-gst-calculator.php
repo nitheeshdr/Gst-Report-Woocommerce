@@ -15,6 +15,22 @@ class GST_Calculator {
         return $total;
     }
 
+    public static function get_order_number( WC_Order $order ): string {
+        // get_order_number() is filtered by sequential-order-number plugins
+        $num = $order->get_order_number();
+        if ( (string) $order->get_id() !== (string) $num ) {
+            return (string) $num;
+        }
+        // Fallback: check common meta keys used by sequential-number plugins
+        foreach ( [ '_order_number_formatted', '_order_number', '_alg_wc_custom_order_number', '_wcson_order_number' ] as $key ) {
+            $val = trim( (string) $order->get_meta( $key ) );
+            if ( $val !== '' ) {
+                return $val;
+            }
+        }
+        return (string) $num;
+    }
+
     public static function get_hsn( WC_Order_Item_Product $item, array $product_map ): string {
         // Check variation first (more specific), then parent product
         $variation_id = $item->get_variation_id();
@@ -22,7 +38,8 @@ class GST_Calculator {
         $ids          = array_filter( [ $variation_id, $product_id ] );
 
         foreach ( $ids as $pid ) {
-            $product = $product_map[ $pid ] ?? null;
+            // Fall back to wc_get_product() for variation objects not in the map
+            $product = $product_map[ $pid ] ?? wc_get_product( $pid );
             if ( ! $product ) continue;
 
             // 1. meta key 'hsn'

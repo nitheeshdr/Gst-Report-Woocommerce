@@ -185,7 +185,7 @@ class GST_Admin_Page {
                     ?>
                     <tr class="<?php echo esc_attr( $row_class ); ?>">
                         <td><?php echo esc_html( $order_date ); ?></td>
-                        <td><?php echo esc_html( $order->get_id() ); ?></td>
+                        <td><?php echo esc_html( GST_Calculator::get_order_number( $order ) ); ?></td>
                         <td><?php echo esc_html( $dc_no ); ?></td>
                         <td><?php echo esc_html( $customer ); ?></td>
                         <td><?php echo esc_html( $gstin ); ?></td>
@@ -217,7 +217,7 @@ class GST_Admin_Page {
                     ?>
                     <tr class="gst-row-shipping <?php echo esc_attr( $row_class ); ?>">
                         <td><?php echo esc_html( $order_date ); ?></td>
-                        <td><?php echo esc_html( $order->get_id() ); ?></td>
+                        <td><?php echo esc_html( GST_Calculator::get_order_number( $order ) ); ?></td>
                         <td><?php echo esc_html( $dc_no ); ?></td>
                         <td><?php echo esc_html( $customer ); ?></td>
                         <td><?php echo esc_html( $gstin ); ?></td>
@@ -267,7 +267,7 @@ class GST_Admin_Page {
             <div class="gst-order-card <?php echo $is_c ? 'gst-order-cancelled' : ''; ?>">
                 <div class="gst-order-header">
                     <div>
-                        <strong>Order #<?php echo esc_html( $order->get_id() ); ?></strong>
+                        <strong>Order <?php echo esc_html( GST_Calculator::get_order_number( $order ) ); ?></strong>
                         <span class="gst-date"><?php echo esc_html( $date ); ?></span>
                         <span class="gst-state"><?php echo esc_html( $order->get_billing_state() ); ?> — <?php echo $gst['is_tn'] ? 'CGST/SGST' : 'IGST'; ?></span>
                     </div>
@@ -424,7 +424,7 @@ class GST_Admin_Page {
                 $total    = ( $adj + $item_tax ) * $mult;
 
                 $xlsx->add_row( [
-                    $date, $order->get_id(), $date, $dc, $customer, $gstin, $state, $hsn,
+                    $date, GST_Calculator::get_order_number( $order ), $date, $dc, $customer, $gstin, $state, $hsn,
                     $item->get_quantity(), round( $adj, 2 ),
                     round( $gst['supply18'], 2 ), round( $gst['cgst9'],   2 ), round( $gst['sgst9'],   2 ), round( $gst['igst18'],  2 ),
                     round( $gst['supply5'],  2 ), round( $gst['cgst2_5'], 2 ), round( $gst['sgst2_5'], 2 ), round( $gst['igst5'],   2 ),
@@ -439,7 +439,7 @@ class GST_Admin_Page {
                 $total    = ( $ship_total + $ship_tax ) * $mult;
 
                 $xlsx->add_row( [
-                    $date, $order->get_id(), $date, $dc, $customer, $gstin, $state, '996812',
+                    $date, GST_Calculator::get_order_number( $order ), $date, $dc, $customer, $gstin, $state, '996812',
                     1, round( $ship_total, 2 ),
                     round( $sg['supply18'], 2 ), round( $sg['cgst9'],   2 ), round( $sg['sgst9'],   2 ), round( $sg['igst18'],  2 ),
                     round( $sg['supply5'],  2 ), round( $sg['cgst2_5'], 2 ), round( $sg['sgst2_5'], 2 ), round( $sg['igst5'],   2 ),
