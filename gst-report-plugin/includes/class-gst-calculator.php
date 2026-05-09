@@ -15,6 +15,21 @@ class GST_Calculator {
         return $total;
     }
 
+    public static function get_invoice_number( WC_Order $order ): string {
+        // Formatted invoice number stored by WPO WCPDF plugin
+        $formatted = trim( (string) $order->get_meta( '_wcpdf_invoice_number_formatted' ) );
+        if ( $formatted !== '' ) {
+            return $formatted;
+        }
+        // Raw integer invoice number — return as-is
+        $raw = trim( (string) $order->get_meta( '_wcpdf_invoice_number' ) );
+        if ( $raw !== '' ) {
+            return $raw;
+        }
+        // Fall back to the sequential order number (e.g. #NJ/2026-2027/W2063)
+        return self::get_order_number( $order );
+    }
+
     public static function get_order_number( WC_Order $order ): string {
         // get_order_number() is filtered by sequential-order-number plugins
         $num = $order->get_order_number();

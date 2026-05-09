@@ -3,7 +3,7 @@
  * Plugin Name: GST Report for WooCommerce
  * Plugin URI:  https://wordpress.org/plugins/gst-report-for-woocommerce/
  * Description: Native PHP GST Dashboard — direct DB, no REST API, no JavaScript frameworks.
- * Version:     2.0.5
+ * Version:     2.0.6
  * Author:      Setups Works
  * Author URI:  https://setups.works/
  * License:     GPLv2 or later
