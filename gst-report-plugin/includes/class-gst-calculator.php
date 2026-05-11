@@ -1,7 +1,7 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class GST_Calculator {
+class GST_Report_Calculator {
 
     public static function is_cancelled( WC_Order $order ): bool {
         return in_array( $order->get_status(), [ 'cancelled', 'refunded', 'failed' ], true );

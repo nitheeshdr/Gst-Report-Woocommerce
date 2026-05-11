@@ -1,7 +1,7 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class GST_Wizard {
+class GST_Report_Wizard {
 
     // ── Activation redirect ───────────────────────────────────────────────────
 
@@ -23,7 +23,7 @@ class GST_Wizard {
             'GST Report Setup',
             'manage_woocommerce',
             'gst-report-setup',
-            [ self::class, 'render' ]
+            [ 'GST_Report_Wizard', 'render' ]
         );
     }
 

@@ -1,7 +1,7 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class GST_Admin_Page {
+class GST_Report_Admin_Page {
 
     private const PER_PAGE = 50;
 
@@ -156,10 +156,10 @@ class GST_Admin_Page {
             </thead>
             <tbody>
             <?php foreach ( $orders as $order ) :
-                $subtotal       = GST_Calculator::calc_subtotal( $order );
+                $subtotal       = GST_Report_Calculator::calc_subtotal( $order );
                 $discount       = (float) $order->get_discount_total();
                 $disc_ratio     = $subtotal > 0 ? $discount / $subtotal : 0;
-                $is_cancelled   = GST_Calculator::is_cancelled( $order );
+                $is_cancelled   = GST_Report_Calculator::is_cancelled( $order );
                 $multiplier     = $is_cancelled ? -1 : 1;
                 $dc_no          = $order->get_meta( '_dc_number' ) ?: '-';
                 $gstin          = $order->get_meta( '_billing_gstin' ) ?: $order->get_meta( 'gstin' ) ?: 'N/A';
@@ -176,16 +176,16 @@ class GST_Admin_Page {
 
                 // Line item rows
                 foreach ( $order->get_items() as $item ) :
-                    $gst            = GST_Calculator::line_item_gst( $item, $order );
-                    $hsn            = GST_Calculator::get_hsn( $item, $product_map );
+                    $gst            = GST_Report_Calculator::line_item_gst( $item, $order );
+                    $hsn            = GST_Report_Calculator::get_hsn( $item, $product_map );
                     $item_sub       = (float) $item->get_subtotal();
                     $adj_sub        = $item_sub - $item_sub * $disc_ratio;
-                    $item_tax       = GST_Calculator::item_tax_total( $item );
+                    $item_tax       = GST_Report_Calculator::item_tax_total( $item );
                     $line_total     = ( $adj_sub + $item_tax ) * $multiplier;
                     ?>
                     <tr class="<?php echo esc_attr( $row_class ); ?>">
                         <td><?php echo esc_html( $order_date ); ?></td>
-                        <td><?php echo esc_html( GST_Calculator::get_invoice_number( $order ) ); ?></td>
+                        <td><?php echo esc_html( GST_Report_Calculator::get_invoice_number( $order ) ); ?></td>
                         <td><?php echo esc_html( $dc_no ); ?></td>
                         <td><?php echo esc_html( $customer ); ?></td>
                         <td><?php echo esc_html( $gstin ); ?></td>
@@ -211,13 +211,13 @@ class GST_Admin_Page {
                 // Shipping row
                 $ship_total = (float) $order->get_shipping_total();
                 if ( $ship_total > 0 ) :
-                    $sg         = GST_Calculator::shipping_gst( $order );
-                    $ship_tax   = GST_Calculator::shipping_tax_total( $order );
+                    $sg         = GST_Report_Calculator::shipping_gst( $order );
+                    $ship_tax   = GST_Report_Calculator::shipping_tax_total( $order );
                     $ship_line  = ( $ship_total + $ship_tax ) * $multiplier;
                     ?>
                     <tr class="gst-row-shipping <?php echo esc_attr( $row_class ); ?>">
                         <td><?php echo esc_html( $order_date ); ?></td>
-                        <td><?php echo esc_html( GST_Calculator::get_invoice_number( $order ) ); ?></td>
+                        <td><?php echo esc_html( GST_Report_Calculator::get_invoice_number( $order ) ); ?></td>
                         <td><?php echo esc_html( $dc_no ); ?></td>
                         <td><?php echo esc_html( $customer ); ?></td>
                         <td><?php echo esc_html( $gstin ); ?></td>
@@ -249,8 +249,8 @@ class GST_Admin_Page {
 
     private static function render_orders_tab( array $orders, array $product_map ): void {
         foreach ( $orders as $order ) :
-            $gst         = GST_Calculator::order_gst( $order );
-            $is_c        = GST_Calculator::is_cancelled( $order );
+            $gst         = GST_Report_Calculator::order_gst( $order );
+            $is_c        = GST_Report_Calculator::is_cancelled( $order );
             $status      = $order->get_status();
             $date        = $order->get_date_created() ? $order->get_date_created()->date( 'd/m/Y H:i' ) : '';
             $gstin       = $order->get_meta( '_billing_gstin' ) ?: $order->get_meta( 'gstin' ) ?: 'N/A';
@@ -267,7 +267,7 @@ class GST_Admin_Page {
             <div class="gst-order-card <?php echo $is_c ? 'gst-order-cancelled' : ''; ?>">
                 <div class="gst-order-header">
                     <div>
-                        <strong>Order <?php echo esc_html( GST_Calculator::get_order_number( $order ) ); ?></strong>
+                        <strong>Order <?php echo esc_html( GST_Report_Calculator::get_order_number( $order ) ); ?></strong>
                         <span class="gst-date"><?php echo esc_html( $date ); ?></span>
                         <span class="gst-state"><?php echo esc_html( $order->get_billing_state() ); ?> — <?php echo $gst['is_tn'] ? 'CGST/SGST' : 'IGST'; ?></span>
                     </div>
@@ -302,7 +302,7 @@ class GST_Admin_Page {
 
                 <div class="gst-order-items">
                     <?php foreach ( $order->get_items() as $item ) :
-                        $hsn = GST_Calculator::get_hsn( $item, $product_map ); ?>
+                        $hsn = GST_Report_Calculator::get_hsn( $item, $product_map ); ?>
                         <div class="gst-item-row">
                             <span><?php echo esc_html( $item->get_name() ); ?> × <?php echo esc_html( $item->get_quantity() ); ?>
                                 <small>(HSN: <?php echo esc_html( $hsn ); ?>)</small>
@@ -394,7 +394,7 @@ class GST_Admin_Page {
                   : '_' . wp_date( 'd-m-Y' );
         $filename = 'GST_Report' . $suffix . '.xlsx';
 
-        $xlsx = new GST_XLSX_Writer();
+        $xlsx = new GST_Report_XLSX_Writer();
         $xlsx->add_row( [
             'Date', 'Inv. No', 'Invoice Date', 'DC. No', 'Customer', 'GSTIN No', 'State',
             'HSN Code', 'Qty', 'Subtotal',
@@ -404,10 +404,10 @@ class GST_Admin_Page {
         ], true );
 
         foreach ( $orders as $order ) {
-            $sub        = GST_Calculator::calc_subtotal( $order );
+            $sub        = GST_Report_Calculator::calc_subtotal( $order );
             $disc       = (float) $order->get_discount_total();
             $disc_ratio = $sub > 0 ? $disc / $sub : 0;
-            $is_c       = GST_Calculator::is_cancelled( $order );
+            $is_c       = GST_Report_Calculator::is_cancelled( $order );
             $mult       = $is_c ? -1 : 1;
             $dc         = $order->get_meta( '_dc_number' ) ?: '-';
             $gstin      = $order->get_meta( '_billing_gstin' ) ?: $order->get_meta( 'gstin' ) ?: 'N/A';
@@ -416,15 +416,15 @@ class GST_Admin_Page {
             $state      = $order->get_billing_state();
 
             foreach ( $order->get_items() as $item ) {
-                $gst      = GST_Calculator::line_item_gst( $item, $order );
-                $hsn      = GST_Calculator::get_hsn( $item, $product_map );
+                $gst      = GST_Report_Calculator::line_item_gst( $item, $order );
+                $hsn      = GST_Report_Calculator::get_hsn( $item, $product_map );
                 $item_sub = (float) $item->get_subtotal();
                 $adj      = $item_sub - $item_sub * $disc_ratio;
-                $item_tax = GST_Calculator::item_tax_total( $item );
+                $item_tax = GST_Report_Calculator::item_tax_total( $item );
                 $total    = ( $adj + $item_tax ) * $mult;
 
                 $xlsx->add_row( [
-                    $date, GST_Calculator::get_invoice_number( $order ), $date, $dc, $customer, $gstin, $state, $hsn,
+                    $date, GST_Report_Calculator::get_invoice_number( $order ), $date, $dc, $customer, $gstin, $state, $hsn,
                     $item->get_quantity(), round( $adj, 2 ),
                     round( $gst['supply18'], 2 ), round( $gst['cgst9'],   2 ), round( $gst['sgst9'],   2 ), round( $gst['igst18'],  2 ),
                     round( $gst['supply5'],  2 ), round( $gst['cgst2_5'], 2 ), round( $gst['sgst2_5'], 2 ), round( $gst['igst5'],   2 ),
@@ -434,12 +434,12 @@ class GST_Admin_Page {
 
             $ship_total = (float) $order->get_shipping_total();
             if ( $ship_total > 0 ) {
-                $sg       = GST_Calculator::shipping_gst( $order );
-                $ship_tax = GST_Calculator::shipping_tax_total( $order );
+                $sg       = GST_Report_Calculator::shipping_gst( $order );
+                $ship_tax = GST_Report_Calculator::shipping_tax_total( $order );
                 $total    = ( $ship_total + $ship_tax ) * $mult;
 
                 $xlsx->add_row( [
-                    $date, GST_Calculator::get_invoice_number( $order ), $date, $dc, $customer, $gstin, $state, '996812',
+                    $date, GST_Report_Calculator::get_invoice_number( $order ), $date, $dc, $customer, $gstin, $state, '996812',
                     1, round( $ship_total, 2 ),
                     round( $sg['supply18'], 2 ), round( $sg['cgst9'],   2 ), round( $sg['sgst9'],   2 ), round( $sg['igst18'],  2 ),
                     round( $sg['supply5'],  2 ), round( $sg['cgst2_5'], 2 ), round( $sg['sgst2_5'], 2 ), round( $sg['igst5'],   2 ),

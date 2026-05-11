@@ -1,7 +1,7 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class GST_XLSX_Writer {
+class GST_Report_XLSX_Writer {
 
     private array $rows = [];
 
