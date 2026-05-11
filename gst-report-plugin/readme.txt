@@ -3,7 +3,7 @@ Contributors: nitheeshdr
 Tags: woocommerce, gst, india, tax, invoice
 Requires at least: 5.9
 Tested up to: 6.9
-Stable tag: 2.0.4
+Stable tag: 2.0.8
 Requires PHP: 7.4
 WC requires at least: 5.0
 WC tested up to: 9.4
@@ -148,6 +148,13 @@ The plugin is designed for single-site WooCommerce installations. Multisite comp
 8. Summary stat cards — total orders, revenue, GST collected, average order.
 
 == Changelog ==
+
+= 2.0.8 =
+* Fixed: Renamed all plugin classes to use the GST_Report_ prefix to meet WordPress.org naming standards.
+* Added: Requires Plugins header declaring WooCommerce as a dependency.
+* Fixed: HSN code now correctly resolved for product variations via on-demand wc_get_product() lookup with static cache.
+* Fixed: Fatal error during Excel export caused by calling object methods on plain strings returned by WC_Product_Variation::get_attributes().
+* Added: Invoice number column now shows WPO WCPDF invoice number when available, falling back to sequential order number.
 
 = 2.0.4 =
 * Fixed: Invoice access key now read automatically from each order using `$order->get_order_key()` — matches the WPO WCPDF "Full" access type URL format (`wc_order_XXXXX`). No manual key entry needed.
